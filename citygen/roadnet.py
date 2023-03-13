@@ -1,5 +1,7 @@
 import json
 import copy
+from scipy.interpolate import interp1d
+import uuid
 
 import numpy as np
 from perlin_noise import PerlinNoise
@@ -7,8 +9,11 @@ from perlin_noise import PerlinNoise
 with open("config.json") as config_file:
     config = json.load(config_file)
 
-def convertMapMatrix(point):
-    return
+def remapPoint(point, intervals_x, intervals_y):
+    remap_x = interp1d(*intervals_x)
+    remap_y = interp1d(*intervals_y)
+    remap_point = [remap_x(point[0]), remap_y(point[1])]
+    return remap_point
 
 class Heatmap:
     '''
@@ -17,21 +22,34 @@ class Heatmap:
         self.width = np.abs(width)
         self.height = np.abs(height)
     '''
-
-    def __init__(self, matrix):
+    def __init__(self, matrix, x, y, width, height):
         self.matrix = matrix
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
 
     def populationOnRoad(self, road):
         return (self.opulationAt(*road.start) + self.opulationAt(*road.end)) / 2
     
     def opulationAt(self, x, y):
+        lines, columns = self.matrix.shape
+        x,y = remapPoint((x,y), [(self.x, self.x+self.width), (0, lines)], 
+                                [(self.y, self.y+self.height), (0, columns)])
         return self.matrix[int(x), int(y)]
-        #return self.noise([x/50, y/50])
 
 class Graph:
     def __init__(self):
         self.edges = {}
-        self.nodes = []
+        self.nodes = {}
+
+    # Finds id of a node given its position
+    def findNodeId(self, position):
+        keys = list(self.nodes.keys())
+        for i, point in enumerate(self.nodes.values()):
+            if (~np.isclose(point, position)).sum() == 0:
+                return keys[i]
+        return None
 
 class Segment:
     def __init__(self, start, end, time_step=0, highway=False, color="black", severed=False, previous_road=None):
@@ -58,7 +76,7 @@ class RoadNet:
         self.height = height
 
         self.segments = []
-        self.heatmap = Heatmap(price_matrix)
+        self.heatmap = Heatmap(price_matrix, x, y, width, height)
         self.graph = Graph()
 
         self.highway_count = 0
@@ -70,6 +88,13 @@ class RoadNet:
     def _sortQueue(self):
         times = [s.time_step for s in self.queue]
         self.queue = self.queue[np.argsort(times)][::-1]
+
+    def updateHeatmap(self, world):
+        price_matrix = np.zeros((world.lines, world.columns))
+        for i in range(world.lines):
+            for j in range(world.columns):
+                price_matrix[i,j] = world.cells[i,j].price
+        self.heatmap.matrix = price_matrix
 
     # A single iteration step
     def step(self):
@@ -97,10 +122,13 @@ class RoadNet:
         
         self.segments += [new_segment_a, new_segment_b]
         
-        self.graph.nodes.append(point)
-        self.graph.edges[(segment.start, point)] = {"highway": segment.highway, "color": segment.color}
-        self.graph.edges[(point, segment.end)] = {"highway": segment.highway, "color": segment.color}
-        del self.graph.edges[(segment.start, segment.end)]
+        # Rounding point to facilitate comparisons
+
+        point_id = uuid.uuid4()
+        self.graph.nodes[point_id] = point
+        self.graph.edges[(self.graph.findNodeId(segment.start), point_id)] = {"highway": segment.highway, "color": segment.color}
+        self.graph.edges[(point_id, self.graph.findNodeId(segment.end))] = {"highway": segment.highway, "color": segment.color}
+        del self.graph.edges[(self.graph.findNodeId(segment.start), self.graph.findNodeId(segment.end))]
         del(segment)
 
         return new_segment_a, new_segment_b
@@ -165,7 +193,7 @@ class RoadNet:
             road.end = intersection
             road.severed = True
             road.color = "red"
-            self.graph.edges[(road.start, intersection)] = {"highway": road.highway, "color": "red"}
+            self.graph.edges[(self.graph.findNodeId(road.start), self.graph.findNodeId(intersection))] = {"highway": road.highway, "color": "red"}
             return True
 
         # 2. Checking snap to crossing within radius check
@@ -176,7 +204,7 @@ class RoadNet:
                 road.severed = True
 
                 road.color = "blue"
-                self.graph.edges[(road.start, point)] = {"highway": road.highway, "color": "blue"}
+                self.graph.edges[(self.graph.findNodeId(road.start), self.graph.findNodeId(point))] = {"highway": road.highway, "color": "blue"}
                 return True
 
         # 3. Intersection within radius check
@@ -193,15 +221,15 @@ class RoadNet:
                     return False
                 segment_a, segment_b = self.splitSegment(other, point)
                 road.color = "green"
-                self.graph.edges[(road.start, point)] = {"highway": road.highway, "color": "green"}
+                self.graph.edges[(self.graph.findNodeId(road.start), self.graph.findNodeId(point))] = {"highway": road.highway, "color": "green"}
                 return True
 
         # Adding new road to the graph
         if road.start not in self.graph.nodes:
-            self.graph.nodes.append(road.start)
+            self.graph.nodes[uuid.uuid4()] = road.start
         if road.end not in self.graph.nodes:
-            self.graph.nodes.append(road.end)
-        self.graph.edges[(road.start, road.end)] = {"highway": road.highway, "color": "black"}
+            self.graph.nodes[uuid.uuid4()] = road.end
+        self.graph.edges[(self.graph.findNodeId(road.start), self.graph.findNodeId(road.end))] = {"highway": road.highway, "color": "black"}
         return True
 
     # Generate next roads according to the global goals from a build road

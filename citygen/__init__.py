@@ -2,10 +2,11 @@ import numpy as np
 
 from world import World
 from roadnet import RoadNet
+from agents import Agents
 
 ELEVATION_FILE = '/data/elevation.tif'
 SEED = 42
-MAX_ITER = 1000
+MAX_ITER = 100
 
 np.random.seed(SEED)
 
@@ -22,6 +23,8 @@ class Generator:
         self.world.updateNetwork(self.roadnet.graph)
 
         # Running exploration phase
+        self.agents.exploration(self.world)
+        self.roadnet.updateHeatmap(self.world)
 
 
 # TO DO: add support to heightmap matrix instead of geo 
@@ -36,6 +39,7 @@ def generate(place):
     for i in range(world.lines):
         for j in range(world.columns):
             price_matrix[i,j] = world.cells[i,j].price
-    roadnet = RoadNet(x, y, width, height, SEED)
+    roadnet = RoadNet(x, y, width, height, price_matrix)
 
-    #return Generator(world, roadnet, None)
+    agents = Agents()
+    return Generator(world, roadnet, agents)

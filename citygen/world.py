@@ -103,6 +103,7 @@ class World:
         reshaped_elevation = np.reshape(cell_elevation_list, (self.lines, self.columns))
         slopes = np.gradient(reshaped_elevation)
         slopes = np.sqrt(slopes[0]**2 + slopes[1]**2)
+        #slopes = slopes/np.max(slopes)
 
         '''
         fig, ax = plt.subplots(1,2)
@@ -122,6 +123,10 @@ class World:
         self.width = width
         self.height = height
 
+    def getEmptyCells(self):
+        flattened_cells = self.cells.flatten()
+        empty_cells = [cell.idx for cell in flattened_cells if cell.empty]
+        return empty_cells
 
     def updateNetwork(self, net):
         self.net = net
@@ -137,7 +142,7 @@ class World:
         print("Calculating cell-network distances...")
         flattened_cells = self.cells.flatten()
         cell_coords = [c.position for c in flattened_cells]
-        node_coords = [n for n in self.net.nodes]
+        node_coords = [n for n in list(self.net.nodes.values())]
 
         # Tries to reduce the searched edges by looking only at those that connect the closest nodes
         node_tree = cKDTree(node_coords) 
@@ -165,10 +170,10 @@ class World:
 
 
     def plotHMap(self):
-        elevations = [c.elevation for c in self.cells.flatten()]
-        elevations = np.array(elevations-min(elevations))/(max(elevations) - min(elevations))
-        #elevations = [c.slope for c in self.cells.flatten()]
+        #elevations = [c.elevation for c in self.cells.flatten()]
         #elevations = np.array(elevations-min(elevations))/(max(elevations) - min(elevations))
+        elevations = [c.slope for c in self.cells.flatten()]
+        elevations = np.array(elevations-min(elevations))/(max(elevations) - min(elevations))
         cells = np.zeros((self.lines, self.columns))
         for i in range(self.lines):
             for j in range(self.columns):
