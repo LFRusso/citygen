@@ -4,21 +4,25 @@ from __init__ import generate
 from plot import plotRoad
 
 EPISODES = 1
-place = 'São Carlos, São Paulo, Brazil'
+place = 'Tatuí, São Paulo, Brazil'
 generator = generate(place)
+
+def plotEpisode(world):
+    #world.plotHMap()
+    #world.plotAgents()
+    world.plotPrices()
+    world.plotNetwork()
+    #world.plotLinks()
+    #world.plotWater()
+    plt.tight_layout()
+    plt.axis("off")
+    plt.show()
 
 for i in range(EPISODES):
     print("episode", i+1)
     generator.runEpisode()
 
-
-    generator.world.plotHMap()
-    #generator.world.plotAgents()
-    #generator.world.plotPrices()
-    generator.world.plotNetwork()
-    plt.tight_layout()
-    plt.axis("off")
-    plt.show()
+    plotEpisode(generator.world)
 
 #plotRoad(generator.roadnet.segments)
 #plt.show()

@@ -6,7 +6,7 @@ import elevation as elev
 import os
 import rasterio as rio
 from rasterio.warp import calculate_default_transform, reproject, Resampling
-from osgeo import gdal
+#from osgeo import gdal
 import pyproj
 import time
 from scipy.spatial import cKDTree
@@ -54,10 +54,11 @@ class World:
     def __init__(self, place, elevation_file, cell_size=50):
         self.place = place
         self.land = ox.geocode_to_gdf(place) # Obtaining geographical data from omnx
-        #self.bounds_latlon = self.land.total_bounds #[-48.139751, -23.3830599, -47.949, -23.2224164]
-        # [-74.047207  40.679654 -73.906769  40.882012]
-        print(self.land.total_bounds)
+        #self.bounds_latlon = self.land.total_bounds 
+        #self.bounds_latlon = [-48.139751, -23.3830599, -47.949, -23.2224164]
+        #self.bounds_latlon = [-74.047207  40.679654 -73.906769  40.882012]
         self.bounds_latlon = [-49.05, -22.3, -49.0, -22.25]
+        print(self.land.total_bounds)
         self.cell_size = cell_size
         self.net = None
 
@@ -172,10 +173,7 @@ class World:
             plt.plot(*np.transpose(edge), color="black")
         plt.axis("equal")
 
-
     def plotHMap(self):
-        #elevations = [c.elevation for c in self.cells.flatten()]
-        #elevations = np.array(elevations-min(elevations))/(max(elevations) - min(elevations))
         elevations = [c.elevation for c in self.cells.flatten()]
         elevations = np.array(elevations-min(elevations))/(max(elevations) - min(elevations))
         cells = np.zeros((self.lines, self.columns))
@@ -187,7 +185,6 @@ class World:
         plt.axis("equal")
 
     def plotAgents(self):
-        #cells = np.empty((self.lines, self.columns, 3), dtype=list)
         cells = []
         for i in range(self.lines):
             cells.append([])
@@ -199,9 +196,7 @@ class World:
                 color = np.array(self.cells[i,j].type_color_rgb)
                 cells[-i-1][j] = color
         cells = np.array(cells)
-        #print(cells.shape)
         plt.imshow(cells, interpolation="nearest", extent=[self.x, self.x+self.width, self.y, self.y+self.height])
-        #plt.axis("equal")
 
     def plotPrices(self):
         elevations = [c.mesh_distance for c in self.cells.flatten()]
@@ -213,7 +208,6 @@ class World:
                 cells[-i-1,j] = color
         plt.imshow(cells, cmap="gray", interpolation="nearest", extent=[self.x, self.x+self.width, self.y, self.y+self.height])
         plt.axis("equal")
-
 
     def plotWater(self):
         for w in self.water:

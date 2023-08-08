@@ -4,7 +4,6 @@ from scipy.interpolate import interp1d
 import uuid
 
 import numpy as np
-from perlin_noise import PerlinNoise
 
 with open("config.json") as config_file:
     config = json.load(config_file)
@@ -16,12 +15,6 @@ def remapPoint(point, intervals_x, intervals_y):
     return remap_point
 
 class Heatmap:
-    '''
-    def __init__(self, seed, width, height):
-        self.noise = PerlinNoise(octaves=3, seed=seed)
-        self.width = np.abs(width)
-        self.height = np.abs(height)
-    '''
     def __init__(self, matrix, x, y, width, height):
         self.matrix = matrix
         self.x = x

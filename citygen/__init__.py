@@ -5,7 +5,7 @@ from roadnet import RoadNet
 from agents import Agents
 
 ELEVATION_FILE = '/data/elevation.tif'
-SEED = 52
+SEED = 102
 MAX_ITER = 500
 
 np.random.seed(SEED)
