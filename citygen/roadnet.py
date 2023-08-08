@@ -34,9 +34,12 @@ class Heatmap:
     
     def opulationAt(self, x, y):
         lines, columns = self.matrix.shape
-        x,y = remapPoint((x,y), [(self.x, self.x+self.width), (0, lines)], 
-                                [(self.y, self.y+self.height), (0, columns)])
-        return self.matrix[int(x), int(y)]
+        try:
+            x,y = remapPoint((x,y), [(self.x, self.x+self.width), (0, lines)], 
+                                    [(self.y, self.y+self.height), (0, columns)])
+            return self.matrix[int(x), int(y)]
+        except:
+            return 0
 
 class Graph:
     def __init__(self):
@@ -128,7 +131,11 @@ class RoadNet:
         self.graph.nodes[point_id] = point
         self.graph.edges[(self.graph.findNodeId(segment.start), point_id)] = {"highway": segment.highway, "color": segment.color}
         self.graph.edges[(point_id, self.graph.findNodeId(segment.end))] = {"highway": segment.highway, "color": segment.color}
-        del self.graph.edges[(self.graph.findNodeId(segment.start), self.graph.findNodeId(segment.end))]
+        try: 
+            del self.graph.edges[(self.graph.findNodeId(segment.start), self.graph.findNodeId(segment.end))]
+        except:
+            print("ERROR: no edge", (self.graph.findNodeId(segment.start), self.graph.findNodeId(segment.end)))
+            pass
         del(segment)
 
         return new_segment_a, new_segment_b
@@ -137,9 +144,10 @@ class RoadNet:
         if (self.x < point[0] and self.x + self.width > point[0]):
             if (self.y < point[1] and self.y + self.height > point[1]):
                 return True
-        print(point)
+        print("Point", point, "out of bounds:")
         print(self.x, self.x + self.width)
         print(self.y, self.y + self.height)
+        print()
         return False
 
     # Checks if road can be built and do necessary changes according to local constraints
