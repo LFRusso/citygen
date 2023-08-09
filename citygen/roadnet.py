@@ -90,6 +90,7 @@ class RoadNet:
         for i in range(world.lines):
             for j in range(world.columns):
                 price_matrix[i,j] = world.cells[i,j].price
+                #print(price_matrix[i,j])
         self.heatmap.matrix = price_matrix
 
     # A single iteration step

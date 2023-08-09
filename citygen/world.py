@@ -6,14 +6,13 @@ import elevation as elev
 import os
 import rasterio as rio
 from rasterio.warp import calculate_default_transform, reproject, Resampling
-#from osgeo import gdal
 import pyproj
 import time
 from scipy.spatial import cKDTree
 from tqdm import tqdm
 
-from plot import plotRoad
-from cell import Cell
+from .plot import plotRoad
+from .cell import Cell
 
 CWD = os.getcwd()
 PROJECTION = pyproj.Transformer.from_crs(pyproj.CRS('EPSG:4326'), pyproj.CRS('EPSG:3857'), always_xy=True).transform
@@ -54,10 +53,10 @@ class World:
     def __init__(self, place, elevation_file, cell_size=50):
         self.place = place
         self.land = ox.geocode_to_gdf(place) # Obtaining geographical data from omnx
-        #self.bounds_latlon = self.land.total_bounds 
+        self.bounds_latlon = self.land.total_bounds 
         #self.bounds_latlon = [-48.139751, -23.3830599, -47.949, -23.2224164]
         #self.bounds_latlon = [-74.047207  40.679654 -73.906769  40.882012]
-        self.bounds_latlon = [-49.05, -22.3, -49.0, -22.25]
+        #self.bounds_latlon = [-49.05, -22.3, -49.0, -22.25]
         print(self.land.total_bounds)
         self.cell_size = cell_size
         self.net = None
@@ -75,7 +74,7 @@ class World:
         '''
         
         # Obtaining bound position in cartesian coordinates
-        output_raster = CWD+"/teste.tif"
+        output_raster = CWD+"/.output.tif"
         heightmap = reproject_raster(CWD+elevation_file, output_raster)
 
         xy1 = (heightmap.bounds.left, heightmap.bounds.bottom)
@@ -108,16 +107,6 @@ class World:
         slopes = np.gradient(reshaped_elevation)
         slopes = np.sqrt(slopes[0]**2 + slopes[1]**2)
         #slopes = slopes/np.max(slopes)
-
-        '''
-        fig, ax = plt.subplots(1,2)
-        ax[1].imshow(slopes, cmap="gray")
-        ax[0].imshow(reshaped_elevation, cmap="gray")
-        fig.tight_layout()
-        ax[0].set_axis_off()
-        ax[1].set_axis_off()
-        plt.show()
-        '''
 
         for i, elevation in enumerate(cell_elevation_list):
             cell_coords = cell_coords_v[i]
@@ -199,7 +188,7 @@ class World:
         plt.imshow(cells, interpolation="nearest", extent=[self.x, self.x+self.width, self.y, self.y+self.height])
 
     def plotPrices(self):
-        elevations = [c.mesh_distance for c in self.cells.flatten()]
+        elevations = [c.price for c in self.cells.flatten()]
         elevations = np.array(elevations-min(elevations))/(max(elevations) - min(elevations))
         cells = np.zeros((self.lines, self.columns))
         for i in range(self.lines):

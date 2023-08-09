@@ -12,7 +12,6 @@ class Cell:
         self.K = K
         self.slope = slope
         self.price = np.exp(-slope)*3000
-        #self.price = np.exp(-elevation)*3000
 
         self.empty = True
         self.type = -1
@@ -22,7 +21,6 @@ class Cell:
         self.linked_node = None
         self.mesh_distance = None
 
-    # TO DO
     def updatePrice(self, price):
         self.price = price
         return
@@ -33,7 +31,7 @@ class Cell:
         if d==None:
             self.mesh_distance = self.distance(P, self.position)
 
-        self.price = 7000 / (1 + self.mesh_distance/1.5)
+        #self.price = 7000 / (1 + self.mesh_distance/1.5)
         #self.price = 7000 * np.exp(-self.mesh_distance)
         #print(self.price, self.mesh_distance)
         self.linked_node = P

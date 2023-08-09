@@ -1,6 +1,8 @@
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+from multiprocessing import Pool
+from tqdm import tqdm
 
 MARKETS = [
     {'id':1, 'wage': 250, 'product': 20, "expenses":100},
@@ -9,7 +11,7 @@ MARKETS = [
 ]
 
 class Agents:
-    def __init__(self, new_agents = 5*50, new_markets = 5*35, cycles = 3, view_radius = 5):
+    def __init__(self, new_agents = 1*50, new_markets = 1*35, cycles = 10, view_radius = 5):
         self.agents = []
         self.markets = []
         self.new_agents = new_agents
@@ -19,7 +21,16 @@ class Agents:
 
         self.v0 = 13
         self.v_foot = 1.5
+
+        self.G = None
         return
+
+    def dist(self, a, b):
+        (x1, y1) = self.G.nodes[a]["pos"]
+        (x2, y2) = self.G.nodes[b]["pos"]
+        d = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
+        t = d/self.v0
+        return t
 
     def exploration(self, world):
         print("exploring")
@@ -49,16 +60,18 @@ class Agents:
 
             cell.setDeveloped(1) # Setting as a residence
 
+        
+        # Building graph from road network
+        edges = list(world.net.edges.keys())
+        G = nx.Graph()
+        G.add_edges_from(edges)
+        self.G = G
+
+        nx.set_node_attributes(self.G, {n: world.net.nodes[n] for n in self.G.nodes()}, "pos")
+        nx.set_edge_attributes(self.G, {e: self.dist(e[0],e[1]) for e in self.G.edges()}, "cost")
+
         # Startig cycles
         for i in range(self.cycles):
-            # Plotting
-            #world.plotAgents()
-            #world.plotNetwork()
-            #plt.tight_layout()
-            #plt.axis('off')
-            #plt.show()
-
-
             print("RUNNING CYCLE", i)
             # Agent activity
             for agent in self.agents:
@@ -68,6 +81,13 @@ class Agents:
             print()
             for market in self.markets:
                 self.marketDynamics(market, world)
+
+            # Updaring prices
+            print("Recalculating cell prices...")
+            flattened_cells = world.cells.flatten()
+            for i in tqdm(range(len(flattened_cells))):
+                self.getPrice(flattened_cells[i], world)
+            print("Finished recalculating cell prices!\n")
 
             # Agent relocation
             print()
@@ -82,6 +102,20 @@ class Agents:
         if (len(selected_markets) == 0):
             # No market of selected type found
             return None, None
+
+        pool = Pool(processes=12)
+        results = [pool.apply_async(self.travelTime, [cell, market.cell, net]) for market in selected_markets]
+        distances = np.zeros(len(selected_markets))
+        for idx, val in enumerate(results):
+            distances[idx] = val.get()
+        
+        idx = np.argsort(distances)
+
+        closest = selected_markets[idx[0]]
+        dist_closest = distances[idx[0]]
+
+        return closest, dist_closest
+
         closest = selected_markets[0]
         dist_closest = self.travelTime(cell, closest.cell, net)
         for market in selected_markets:
@@ -120,23 +154,16 @@ class Agents:
 
         # 5. Receives wage
         agent.money += agent.job.wage
-        print("agent finished loop in", total_time,"seconds")
+        print("agent finished loop in", total_time,"ms")
         return
 
     # Checks if market is relocated based on this cycles' profit and expenses
     def marketDynamics(self, market, world):
-        #expenses = MARKETS[market.type]["expenses"]
         expenses = 1000+market.wage * len(market.workers)
         print("EXPENSES:", expenses)
         print("PROFITS:", market.cycle_profit)
         if (market.cycle_profit < expenses):
             # Relocate
-
-            #empty_cells = world.getEmptyCells()
-            #idx = np.random.randint(0, len(empty_cells))
-            #new_pos = empty_cells[idx]
-            #new_cell = world.cells[new_pos[0], new_pos[1]]
-            #print("relocating market", new_pos)
             i, j = market.x, market.y
             vicinity = world.cells[max(i-self.view_radius,0) : min(i+self.view_radius+1, world.lines),
                                 max(j-self.view_radius,0) : min(j+self.view_radius+1, world.columns)]
@@ -151,11 +178,17 @@ class Agents:
             new_cell = vicinity[-1]
 
             market.relocate(new_cell)
+            print()
         else:
-            print("not relocating")
+            print("not relocating\n")
     
     # Calculates the price of a cell give its geographical location and markets
     def getPrice(self, cell, world):
+        #max_distance = max([c.mesh_distance for c in world.cells.flatten()])
+        #price = 7000*np.exp(np.log(2)*cell.mesh_distance/max_distance) + np.exp(-cell.slope)*3000 # Provisional value, change after fixing threading
+        price = cell.mesh_distance
+        cell.price = price
+        return price
         market_types = [i for i in range(len(MARKETS))]
         distances = [self.getClosestMarket(cell, market, world.net)[1] for market in market_types]
         price = 7000*sum([np.exp(-d) for d in distances])/len(MARKETS) + np.exp(-cell.slope)*3000
@@ -184,13 +217,16 @@ class Agents:
         #prices = [self.getPrice(cell, world) for cell in vicinity]
         
         # Calculating personal score for agent
+        pool = Pool(processes=12)
+        #results = [pool.apply_async(self.travelTime, [agent.job.cell, cell, world.net]) for cell in vicinity]
+        personal_scores = np.zeros((len(vicinity)))
+        #for index, val in enumerate(results):
+        #    personal_scores[index] = 2 - val.get() * np.log(2) / 1000
         #personal_scores = [ 2 - np.exp(self.travelTime(agent.job.cell, cell, world.net) * np.log(2) / 1000) for cell in vicinity] 
-        #personal_scores = [3000 / ( 1 + self.travelTime(agent.job.cell, cell, world.net) ) for cell in vicinity]
 
         # Final score for the agent = price + personal score
         #scores = [p + s for p,s in zip(prices, personal_scores)]
-        #scores = [c.price + s for c, s in zip(vicinity, personal_scores)]
-        scores = [c.price for c in vicinity]
+        scores = [c.mesh_distance + s for c, s in zip(vicinity, personal_scores)]
 
         # Sorting cells by score
         idx = np.argsort(scores)
@@ -198,30 +234,23 @@ class Agents:
         vicinity = np.array(vicinity)[idx]
 
         # Checking if best prospect location is better than current
-        #current_score = self.getPrice(agent.residence, world) + (2 - np.exp(self.travelTime(agent.job.cell, agent.residence, world.net) * np.log(2) / 1000))
-        current_score = agent.residence.price
-        best_cell = vicinity[-1]
-        best_cell_score = scores[-1]
+        current_score = agent.residence.mesh_distance #+ (2 - np.exp(self.travelTime(agent.job.cell, agent.residence, world.net) * np.log(2) / 1000))
+        best_cell = vicinity[0]
+        best_cell_score = scores[0] #+ (2 - np.exp(self.travelTime(agent.job.cell, best_cell, world.net) * np.log(2) / 1000))
         
-        if (best_cell_score > current_score):
+        print("current:", best_cell_score)
+        print("best:", best_cell_score)
+        if (best_cell_score < current_score):
             agent.moveTo(best_cell)
         else:
             pass
-            #print("not moving")
+            print("not moving")
 
     # Finds travel trime using shortest path between two cells in the map by A*
     def travelTime(self, start_cell, end_cell, net):
-        def dist(a, b):
-            (x1, y1) = G.nodes[a]["pos"]
-            (x2, y2) = G.nodes[b]["pos"]
-            d = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
-            t = d/self.v0
-            return t
-
         # No network built yet, use euclidean distance
         dist_cells = np.linalg.norm(np.array(start_cell.position)-np.array(end_cell.position))
-        #if (net==None):
-        if (True):
+        if (net==None):
             t = dist_cells / self.v_foot
             return t
 
@@ -232,32 +261,12 @@ class Agents:
             t = dist_cells / self.v_foot
             return t
 
-        edges = list(net.edges.keys())
-        G = nx.Graph()
-        G.add_edges_from(edges)
-
-        nx.set_node_attributes(G, {n: net.nodes[n] for n in G.nodes()}, 'pos')
-        nx.set_edge_attributes(G, {e: dist(e[0],e[1]) for e in G.edges()}, "cost")
-        
         start_node = net.findNodeId(start_cell.linked_node)
         end_node = net.findNodeId(end_cell.linked_node)
         
-        path_len = nx.astar_path_length(G, start_node, end_node, heuristic=dist, weight="cost")
+        path_len = nx.astar_path_length(self.G, start_node, end_node, heuristic=self.dist, weight="cost")
         total_time = dist_net_in/self.v_foot + path_len + dist_net_out/self.v_foot
         return total_time
-
-        #path = nx.astar_path(G, start_node, end_node, heuristic=dist, weight="cost")
-        #path_edges = list(zip(path, path[1:]))
-        #pos = {n:G.nodes[n]["pos"] for n in G.nodes()}
-        #nx.draw(G, pos, node_color="k", node_size=5)
-        #nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='r')
-        #plt.show()
-
-        return
-
-    # Adds n new agents to the system, initialized randomly
-    def addAgents(self, n):
-        return
 
 
 class Agent:
@@ -281,7 +290,7 @@ class Agent:
 
     # Changes residence 
     def moveTo(self, cell):
-        #print("moving!")
+        print("moving!")
         self.residence.setEmpty()
         self.residence = cell
         self.x, self.y = cell.idx
