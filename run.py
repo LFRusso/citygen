@@ -18,10 +18,7 @@ def plotEpisode(world):
     plt.show()
 
 def plotPrices(world):
-    world.plotHMap()
-    world.plotAgents()
     world.plotPrices()
-    world.plotNetwork()
     plt.tight_layout()
     plt.axis("off")
     plt.show()
@@ -31,4 +28,4 @@ for i in range(EPISODES):
     generator.runEpisode()
 
     plotEpisode(generator.world)
-    plotPrices(generator.world)
+    #plotPrices(generator.world)

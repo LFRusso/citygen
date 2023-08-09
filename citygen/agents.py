@@ -11,7 +11,7 @@ MARKETS = [
 ]
 
 class Agents:
-    def __init__(self, new_agents = 1*50, new_markets = 1*35, cycles = 10, view_radius = 5):
+    def __init__(self, new_agents = 5*50, new_markets = 5*35, cycles = 10, view_radius = 5):
         self.agents = []
         self.markets = []
         self.new_agents = new_agents
