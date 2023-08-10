@@ -1,12 +1,12 @@
 import numpy as np
 
-from world import World
-from roadnet import RoadNet
-from agents import Agents
+from .world import World
+from .roadnet import RoadNet
+from .agents import Agents
 
 ELEVATION_FILE = '/data/elevation.tif'
 SEED = 42
-MAX_ITER = 100
+MAX_ITER = 500
 
 np.random.seed(SEED)
 

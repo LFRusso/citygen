@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import shapely.geometry
-import geopandas as gpd
+#import geopandas as gpd
 from matplotlib.patches import Polygon
 
 def plotGraph(graph, x_lim, y_lim):
